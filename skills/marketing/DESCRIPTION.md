@@ -1,0 +1,1 @@
+Ngọc Việt marketing skills for verified CNC/HVAC product research, canonical content, SEO, multi-channel repurposing, analytics and attribution. All production write/spend actions remain approval-gated.
