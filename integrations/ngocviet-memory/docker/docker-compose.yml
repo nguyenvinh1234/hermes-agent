@@ -1,0 +1,132 @@
+# NgocViet Shared Agent Memory stack — Mem0 self-hosted + Postgres/pgvector + Gateway.
+#
+# Isolated on its own network/volumes; does NOT touch Odoo, n8n, or any other
+# production compose project. Nothing here uses `docker compose down -v`,
+# `docker system prune`, or any command that could affect another project's
+# containers/volumes/networks — those are out of scope by design.
+#
+# Usage (run from this `docker/` directory):
+#   cp ../.env.example ../.env   # then fill in real secrets, see docs/security.md
+#   docker compose --env-file ../.env config   # dry-run: verify before touching anything
+#   docker compose --env-file ../.env up -d
+#
+# Before first run: read docs/deployment.md Phase 0/1. In particular, pin
+# MEM0_SOURCE_GIT_REF to a commit SHA you have personally verified on
+# https://github.com/mem0ai/mem0 — do not trust a tag name from anywhere
+# else, this repo included.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: ngocviet-mem0-postgres
+    restart: unless-stopped
+    # No `ports:` — intentionally not published to the host or the internet.
+    # Reachable only from other containers on ngocviet-memory-net.
+    networks:
+      - ngocviet-memory-net
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - ngocviet_mem0_postgres_data:/var/lib/postgresql/data
+    shm_size: "128mb"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ngocviet_memory}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  mem0:
+    build:
+      # Vendor mem0's own source at a pinned commit before building — see
+      # docs/deployment.md "Phase 1 — Mem0". Never build against a moving
+      # branch (`main`) or an unverified tag.
+      context: ${MEM0_SOURCE_DIR:-../vendor/mem0}
+      dockerfile: server/dev.Dockerfile
+    container_name: ngocviet-mem0
+    restart: unless-stopped
+    # Disable the upstream dev image's --reload flag for a production run.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # No `ports:` published — internal network only, per section 5 of the
+    # rollout spec ("Không expose trực tiếp Internet"). The gateway reaches
+    # it at http://mem0:8000 over ngocviet-memory-net. If you need to debug
+    # directly, temporarily add `- "127.0.0.1:8899:8000"` and remove it
+    # again afterwards — never bind 0.0.0.0.
+    networks:
+      - ngocviet-memory-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Verify every one of these against the pinned commit's own
+      # server/.env.example — field names have changed across mem0 releases.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MEM0_ADMIN_API_KEY: ${MEM0_API_KEY:?MEM0_API_KEY is required}
+      MEM0_JWT_SECRET: ${MEM0_JWT_SECRET:?MEM0_JWT_SECRET is required}
+      LLM_PROVIDER: ${LLM_PROVIDER:?LLM_PROVIDER is required}
+      LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY is required}
+      MEM0_TELEMETRY: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/', timeout=3).status < 500 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  gateway:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    container_name: ngocviet-memory-gateway
+    restart: unless-stopped
+    # Bound to loopback only by default — see GATEWAY_BIND_HOST/PORT in
+    # .env.example. Confirm the port is actually free on the target host
+    # during the Phase 0 audit before deploying (it deliberately avoids the
+    # ports flagged as commonly-occupied: 3000/3080/5432/8000/8080/8090/8888/9000).
+    ports:
+      - "${GATEWAY_BIND_HOST:-127.0.0.1}:${GATEWAY_BIND_PORT:-8077}:8077"
+    networks:
+      - ngocviet-memory-net
+    depends_on:
+      mem0:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      MEM0_API_URL: http://mem0:8000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8077/health', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  ngocviet-memory-net:
+    name: ngocviet-memory-net
+    driver: bridge
+
+volumes:
+  ngocviet_mem0_postgres_data:
+    name: ngocviet_mem0_postgres_data

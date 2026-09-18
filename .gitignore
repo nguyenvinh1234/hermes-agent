@@ -225,3 +225,22 @@ native/fts5_cjk/*.so
 
 # Disposable profile created by scripts/probe_active_session_exclusivity.py
 .probe-home/
+
+# NgocViet Memory subsystem (integrations/ngocviet-memory/) — independent
+# subproject, see integrations/ngocviet-memory/README.md. Most of these
+# already match via the general rules above; listed explicitly so the
+# subsystem's own contributors can audit its secret/artifact hygiene at a
+# glance without reading the whole repo's .gitignore.
+integrations/ngocviet-memory/.env
+integrations/ngocviet-memory/.env.*
+!integrations/ngocviet-memory/.env.example
+integrations/ngocviet-memory/**/*.pem
+integrations/ngocviet-memory/**/*.key
+integrations/ngocviet-memory/backups/
+integrations/ngocviet-memory/logs/
+# Vendored third-party Mem0 source (cloned per docs/deployment.md Phase 1) —
+# never commit someone else's repo into this one.
+integrations/ngocviet-memory/vendor/
+integrations/ngocviet-memory/**/.pytest_cache/
+integrations/ngocviet-memory/**/__pycache__/
+integrations/ngocviet-memory/**/.venv/

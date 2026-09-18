@@ -1,0 +1,8 @@
+name: memory_gateway
+version: 1.0.0
+description: >
+  Read/write access to the NgocViet Memory Gateway (Mem0-backed shared
+  agent memory). Exposes memory_search, memory_add, memory_feedback.
+  No delete capability by design — see README.md.
+provides_tools: [memory_search, memory_add, memory_feedback]
+requires_env: [MEMORY_GATEWAY_URL, MEMORY_GATEWAY_API_KEY]
