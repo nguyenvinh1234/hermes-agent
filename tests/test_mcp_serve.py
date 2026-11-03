@@ -959,7 +959,7 @@ class TestE2EPermissions:
 
 
 # ---------------------------------------------------------------------------
-# 4. TOOL LISTING — verify all 10 tools are registered
+# 4. TOOL LISTING — verify every tool is registered
 # ---------------------------------------------------------------------------
 
 class TestToolRegistration:
@@ -973,6 +973,7 @@ class TestToolRegistration:
             "attachments_fetch", "events_poll", "events_wait",
             "messages_send", "channels_list",
             "permissions_list_open", "permissions_respond",
+            "tasks_create", "tasks_list", "tasks_get", "tasks_comment",
         }
         assert expected == tool_names, f"Missing: {expected - tool_names}, Extra: {tool_names - expected}"
 
@@ -1048,10 +1049,12 @@ class TestCliIntegration:
         monkeypatch.setattr("mcp_serve.run_mcp_server", mock_run)
 
         import argparse
-        args = argparse.Namespace(mcp_action="serve", verbose=True)
+        args = argparse.Namespace(mcp_action="serve", verbose=True, http=True, port=9000)
         from hermes_cli.mcp_config import mcp_command
         mcp_command(args)
-        mock_run.assert_called_once_with(verbose=True)
+        mock_run.assert_called_once()
+        kwargs = mock_run.call_args.kwargs
+        assert (kwargs["verbose"], kwargs["http"], kwargs["port"]) == (True, True, 9000)
 
 
 # ---------------------------------------------------------------------------

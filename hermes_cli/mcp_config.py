@@ -1036,7 +1036,11 @@ def mcp_command(args):
     action = getattr(args, "mcp_action", None)
     if action == "serve":
         from mcp_serve import run_mcp_server
-        run_mcp_server(verbose=getattr(args, "verbose", False))
+        run_mcp_server(
+            verbose=getattr(args, "verbose", False), http=getattr(args, "http", False),
+            host=getattr(args, "host", None), port=getattr(args, "port", None),
+            rotate_token=getattr(args, "rotate_token", False),
+            public_url=getattr(args, "public_url", None))
         return
     if action in ("picker", "catalog", "install"):
         # Catalog subcommands live in mcp_picker / mcp_catalog; import lazily to keep this module cheap.

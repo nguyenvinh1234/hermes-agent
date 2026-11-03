@@ -15,13 +15,23 @@ def build_mcp_parser(subparsers, *, cmd_mcp: Callable) -> None:
         description="Manage MCP server connections and run Hermes as an MCP server.\n\n"
             "MCP servers provide additional tools via the Model Context Protocol.\n"
             "Use 'hermes mcp add' to connect to a new server, or\n"
-            "'hermes mcp serve' to expose Hermes conversations over MCP.")
+            "'hermes mcp serve' to expose Hermes (conversations + tasks) over MCP.")
     mcp_sub = mcp_parser.add_subparsers(dest="mcp_action")
 
     mcp_serve_p = mcp_sub.add_parser(
-        "serve", help="Run Hermes as an MCP server (expose conversations to other agents)")
+        "serve", help="Run Hermes as an MCP server (conversations + task delegation for other agents)")
     mcp_serve_p.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging on stderr")
+    mcp_serve_p.add_argument(
+        "--http", action="store_true",
+        help="Serve streamable HTTP instead of stdio (for ChatGPT / Claude connectors, phones)")
+    mcp_serve_p.add_argument("--host", help="HTTP bind address (default: 127.0.0.1)")
+    mcp_serve_p.add_argument("--port", type=int, help="HTTP port (default: 8765)")
+    mcp_serve_p.add_argument(
+        "--public-url", help="Public HTTPS base URL of your tunnel, to print the full connector URL")
+    mcp_serve_p.add_argument(
+        "--rotate-token", action="store_true",
+        help="Generate a new access token (invalidates connector URLs already handed out)")
     add_accept_hooks_flag(mcp_serve_p)
 
     mcp_add_p = mcp_sub.add_parser("add", help="Add an MCP server (discovery-first install)")

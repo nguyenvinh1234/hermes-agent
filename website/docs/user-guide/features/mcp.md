@@ -838,13 +838,14 @@ The 5-minute default timeout mirrors the gateway approval default so users on as
 
 ## Running Hermes as an MCP server
 
-In addition to connecting **to** MCP servers, Hermes can also **be** an MCP server. This lets other MCP-capable agents (Claude Code, Cursor, Codex, or any MCP client) use Hermes's messaging capabilities — list conversations, read message history, and send messages across all your connected platforms.
+In addition to connecting **to** MCP servers, Hermes can also **be** an MCP server. This lets other MCP-capable agents (Claude Code, Cursor, Codex, or any MCP client) use Hermes's messaging capabilities — list conversations, read message history, and send messages across all your connected platforms — and **hand tasks to Hermes**. With `--http` it also serves remote clients such as ChatGPT and Claude, including their phone apps.
 
 ### When to use this
 
 - You want Claude Code, Cursor, or another coding agent to send and read Telegram/Discord/Slack messages through Hermes
 - You want a single MCP server that bridges to all of Hermes's connected messaging platforms at once
 - You already have a running Hermes gateway with connected platforms
+- You want to assign work to Hermes from your phone by talking to ChatGPT or Claude (see [Remote access](#remote-access-chatgpt-claude-phone))
 
 ### Quick start
 
@@ -884,7 +885,7 @@ Or if you installed Hermes in a specific location:
 
 ### Available tools
 
-The MCP server exposes 10 tools, matching OpenClaw's channel bridge surface plus a Hermes-specific channel browser:
+The messaging tools match OpenClaw's channel bridge surface plus a Hermes-specific channel browser; the `tasks_*` tools delegate work through the [Kanban board](./kanban.md):
 
 | Tool | Description |
 |------|-------------|
@@ -898,6 +899,10 @@ The MCP server exposes 10 tools, matching OpenClaw's channel bridge surface plus
 | `channels_list` | List available messaging targets across all platforms. |
 | `permissions_list_open` | List pending approval requests observed during this bridge session. |
 | `permissions_respond` | Allow or deny a pending approval request. |
+| `tasks_create` | Assign a task to Hermes. Returns a task id at once; the gateway's Kanban dispatcher runs it in the background. |
+| `tasks_list` | List tasks on the board, newest first (optional status filter). |
+| `tasks_get` | A task's status, final `result`, and latest comments. |
+| `tasks_comment` | Add a follow-up note; on a `blocked` task it answers the question and re-queues it. |
 
 ### Event system
 
@@ -918,9 +923,41 @@ The event queue is in-memory and starts when the bridge connects. Older messages
 ### Options
 
 ```bash
-hermes mcp serve              # Normal mode
-hermes mcp serve --verbose    # Debug logging on stderr
+hermes mcp serve                                  # stdio (local MCP clients)
+hermes mcp serve --verbose                        # Debug logging on stderr
+hermes mcp serve --http                           # Streamable HTTP on 127.0.0.1:8765
+hermes mcp serve --http --host 0.0.0.0 --port 9000
+hermes mcp serve --http --public-url https://hermes.example.com   # print the full connector URL
+hermes mcp serve --http --rotate-token            # issue a new token, revoking old URLs
 ```
+
+### Remote access (ChatGPT, Claude, phone)
+
+ChatGPT and Claude can only reach MCP servers over HTTPS, so run the HTTP transport and put a tunnel in front of it. Claude syncs custom connectors to its iOS/Android apps, so you can say "ask Hermes to …" on your phone and the assistant files a task with `tasks_create`. (ChatGPT developer-mode availability on mobile and in voice mode depends on your plan and app version — check in the app.)
+
+1. **Start the gateway** (it hosts the Kanban dispatcher that actually runs tasks) and the MCP server:
+
+   ```bash
+   hermes gateway start
+   hermes mcp serve --http
+   ```
+
+   On first run a random access token is generated and saved as `MCP_SERVE_TOKEN` in `~/.hermes/.env`. The command prints the local URL `http://127.0.0.1:8765/mcp/<token>`.
+
+2. **Expose it over HTTPS** with any tunnel, for example:
+
+   ```bash
+   cloudflared tunnel --url http://127.0.0.1:8765     # quick, temporary *.trycloudflare.com URL
+   tailscale funnel 8765                              # stable URL on your tailnet domain
+   ```
+
+3. **Add the connector** with URL `https://<public-host>/mcp/<token>` and **no authentication**:
+   - **Claude** (claude.ai → Settings → Connectors → Add custom connector). Enable it in a chat from the tools menu.
+   - **ChatGPT** (Settings → Apps & Connectors → Advanced settings → enable Developer mode → Create). Select it in a chat from the "+" menu → Developer mode.
+
+4. **Use it from your phone**: "Giao cho Hermes: tóm tắt email hôm nay và gửi qua Telegram", then later "What did Hermes finish?" (`tasks_list` / `tasks_get`).
+
+Security: the token in the URL is the only credential — anyone holding the URL can create tasks that Hermes executes with your tools. Keep it private, and run `--rotate-token` if it leaks. Clients that can send headers can use `https://<public-host>/mcp` with `Authorization: Bearer <token>` instead. Every other path (including OAuth discovery probes) returns 404, and access logging is disabled so the token never reaches log files.
 
 ### How it works
 
@@ -930,7 +967,7 @@ The gateway does NOT need to be running for read operations (listing conversatio
 
 ### Current limits
 
-- The embedded `hermes mcp serve` exposes a **stdio-only** MCP server today. If you need an HTTP MCP server, run a separate adapter — or, much more commonly, use the MCP **client** side of Hermes, which already speaks both stdio and HTTP (`url` + `headers` in `mcp_servers.yaml` / `config.yaml`; see [HTTP servers](#http-servers) above).
+- The HTTP transport authenticates with a static token (capability URL or bearer), not OAuth.
 - Event polling at ~200ms intervals via mtime-optimized DB polling (skips work when files are unchanged)
 - No `claude/channel` push notification protocol yet
 - Text-only sends (no media/attachment sending through `messages_send`)

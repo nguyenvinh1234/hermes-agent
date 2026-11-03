@@ -2842,6 +2842,10 @@ OPTIONAL_ENV_VARS = {
         advanced=True),
     "API_SERVER_PORT": _msg("Port for the API server (default: 8642).", "API server port", None,
         advanced=True),
+    "MCP_SERVE_TOKEN": _msg(
+        "Access token for `hermes mcp serve --http` (connector URL /mcp/<token> or Bearer). "
+        "Generated on first run; rotate with --rotate-token.", "MCP serve access token", None,
+        password=True, advanced=True),
     "API_SERVER_HOST": _msg(
         "Host/bind address for the API server (default: 127.0.0.1). API_SERVER_KEY is still "
         "required even on loopback binds.", "API server host", None, advanced=True),

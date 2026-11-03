@@ -1,14 +1,17 @@
 """
-Hermes MCP Server — expose messaging conversations as MCP tools (`hermes mcp serve`).
+Hermes MCP Server — expose messaging conversations and task delegation as MCP tools (`hermes mcp serve`).
 
-A stdio MCP server letting any MCP client (Claude Code, Cursor, Codex, ...) list
-conversations, read history, send messages, poll live events, and manage approvals.
-Matches OpenClaw's 9-tool channel bridge surface plus the Hermes-specific
-channels_list. Client config: {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
+An MCP server letting any MCP client (Claude Code, Cursor, Codex, ChatGPT, Claude apps, ...)
+list conversations, read history, send messages, poll live events, manage approvals, and hand
+tasks to Hermes (`mcp_serve_tasks.py`). The messaging tools match OpenClaw's 9-tool channel
+bridge surface plus the Hermes-specific channels_list.
+stdio (default): {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
+HTTP (`--http`, for remote/mobile clients): see `mcp_serve_http.py`.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -693,19 +696,27 @@ def create_mcp_server(event_bridge: Optional[EventBridge] = None) -> "MCPServer"
     """Create and return the Hermes MCP server with all tools registered."""
     if not _MCP_SERVER_AVAILABLE:
         raise ImportError(f"MCP server requires the 'mcp' package. Install with: {sys.executable} -m pip install 'mcp'")
+    from mcp_serve_tasks import TASK_TOOLS
+
     mcp = MCPServer("hermes", instructions=(
-        "Hermes Agent messaging bridge. Use these tools to interact with "
-        "conversations across Telegram, Discord, Slack, WhatsApp, Signal, "
-        "Matrix, and other connected platforms."
+        "Hermes Agent: a personal AI agent with its own terminal, browser, files, "
+        "memory and skills. Delegate work with tasks_create (it runs in the "
+        "background; follow up with tasks_get / tasks_comment). The other tools "
+        "interact with conversations across Telegram, Discord, Slack, WhatsApp, "
+        "Signal, Matrix, and other connected platforms."
     ))
     handlers = _ToolHandlers(event_bridge or EventBridge())
     for name in _TOOL_NAMES:
         mcp.tool()(getattr(handlers, name))
+    for fn in TASK_TOOLS:
+        mcp.tool()(fn)
     return mcp
 
 
-def run_mcp_server(verbose: bool = False) -> None:
-    """Start the Hermes MCP server on stdio."""
+def run_mcp_server(verbose: bool = False, *, http: bool = False, host: Optional[str] = None,
+                   port: Optional[int] = None, rotate_token: bool = False,
+                   public_url: Optional[str] = None) -> None:
+    """Start the Hermes MCP server on stdio, or with ``http`` on streamable HTTP."""
     if not _MCP_SERVER_AVAILABLE:
         print("Error: MCP server requires the 'mcp' package.\n"
               f"Install with: {sys.executable} -m pip install 'mcp'", file=sys.stderr)
@@ -716,9 +727,20 @@ def run_mcp_server(verbose: bool = False) -> None:
     server = create_mcp_server(event_bridge=bridge)
     import asyncio
 
+    if http:
+        import mcp_serve_http as transport
+
+        host = host or transport.DEFAULT_HOST
+        port = port or transport.DEFAULT_PORT
+        token = transport.resolve_token(rotate=rotate_token)
+        transport.print_connect_help(host, port, token, public_url)
+        serve = functools.partial(transport.serve_http, server, host=host, port=port, token=token)
+    else:
+        serve = server.run_stdio_async
+
     async def _run():
         try:
-            await server.run_stdio_async()
+            await serve()
         finally:
             bridge.stop()
 
