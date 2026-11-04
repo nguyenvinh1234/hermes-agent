@@ -50,8 +50,8 @@ class FakeOdoo(BaseHTTPRequestHandler):
             elif method == "search_read":
                 fields = kwargs["fields"]
                 result = [{k: r[k] for k in fields} for r in PARTNERS][: kwargs["limit"]]
-            elif method == "unlink":
-                error = {"message": "Odoo Server Error", "data": {"message": "You are not allowed to delete"}}
+            elif method == "create":
+                error = {"message": "Odoo Server Error", "data": {"message": "You are not allowed to create"}}
         body = {"jsonrpc": "2.0", "id": req["id"]}
         body.update({"error": error} if error else {"result": result})
         data = json.dumps(body).encode()
@@ -117,18 +117,35 @@ class OdooMcpE2E(unittest.TestCase):
         self.assertEqual([r["name"] for r in records], [p["name"] for p in PARTNERS])
         self.assertTrue(all("image_1920" not in r for r in records))
 
-    def test_odoo_errors_surface_as_tool_errors_and_read_only_hides_writes(self):
-        rpc = self.start()
-        is_err, text = self.call(rpc, "odoo_unlink", {"model": "res.partner", "ids": [2]})
-        self.assertTrue(is_err)
-        self.assertIn("not allowed to delete", text)
-
-        ro = self.start(ODOO_READ_ONLY="1")
+    def test_read_only_by_default_and_write_mode_never_deletes_or_touches_accounting(self):
+        """Policy from decision 6 in ODOO_NGU_CANH_HIEN_TAI: read-only, no delete, no accounting edits."""
+        write_tools = {"odoo_create", "odoo_write", "odoo_call_method"}
+        ro = self.start()
         names = {t["name"] for t in ro("tools/list")["result"]["tools"]}
         self.assertIn("odoo_search_read", names)
-        self.assertFalse(names & {"odoo_create", "odoo_write", "odoo_unlink", "odoo_call_method"})
-        is_err, _ = self.call(ro, "odoo_unlink", {"model": "res.partner", "ids": [2]})
+        self.assertFalse(names & (write_tools | {"odoo_unlink"}))
+        is_err, _ = self.call(ro, "odoo_write", {"model": "res.partner", "ids": [2], "values": {"name": "x"}})
         self.assertTrue(is_err)
+
+        rw = self.start(ODOO_ALLOW_WRITE="1")
+        names = {t["name"] for t in rw("tools/list")["result"]["tools"]}
+        self.assertTrue(write_tools <= names)
+        self.assertNotIn("odoo_unlink", names)
+        FakeOdoo.calls.clear()
+        refused = [
+            ("odoo_call_method", {"model": "res.partner", "method": "unlink", "args": [[2]]}),
+            ("odoo_write", {"model": "account.move", "ids": [1], "values": {"ref": "x"}}),
+            ("odoo_call_method", {"model": "account.move", "method": "action_post", "args": [[1]]}),
+        ]
+        for name, args in refused:
+            is_err, text = self.call(rw, name, args)
+            self.assertTrue(is_err, (name, text))
+        self.assertFalse([c for c in FakeOdoo.calls if c[0] == "object"],
+                         "refused calls must not reach Odoo")
+        # Errors raised by Odoo itself still come back as tool errors.
+        is_err, text = self.call(rw, "odoo_create", {"model": "res.partner", "values": {"name": "x"}})
+        self.assertTrue(is_err)
+        self.assertIn("not allowed to create", text)
 
     def test_bad_credentials_report_authentication_failure(self):
         rpc = self.start(ODOO_API_KEY="wrong")

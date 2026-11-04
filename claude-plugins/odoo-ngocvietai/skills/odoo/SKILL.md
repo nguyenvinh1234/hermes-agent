@@ -20,10 +20,15 @@ record rules apply.
 | `odoo_read` | Read known IDs. |
 | `odoo_search_count` | Count before fetching large sets. |
 | `odoo_read_group` | Totals/grouping (revenue per customer, invoices per month). |
-| `odoo_create` / `odoo_write` / `odoo_unlink` | Change data — **confirm with the user first**. |
-| `odoo_call_method` | Workflow buttons: `action_confirm`, `action_post`, `button_validate`, `name_search`, … |
+| `odoo_create` / `odoo_write` | Change data — **confirm with the user first**. |
+| `odoo_call_method` | Workflow buttons: `action_confirm`, `action_set_won`, `button_validate`, … |
 
-Write tools are hidden when `ODOO_READ_ONLY=1`.
+**Read-only by default.** The three write tools exist only when `ODOO_ALLOW_WRITE=1`.
+Even then the plugin refuses, without calling Odoo: deleting (there is no delete
+tool and `call_method` rejects `unlink`) and any change to accounting models
+(`account.*`). This follows Ngọc Việt's decision 6 in `ODOO_NGU_CANH_HIEN_TAI`.
+If the user asks for one of these, say it is blocked by policy; do not look for a
+workaround.
 
 ## Working rules
 
@@ -33,8 +38,8 @@ Write tools are hidden when `ODOO_READ_ONLY=1`.
    with `offset`.
 3. **Inspect before writing.** Run `odoo_get_fields` on the model, check `required`
    fields and selection values, then show the user the exact values and get a yes
-   before `odoo_create` / `odoo_write` / `odoo_unlink` / `odoo_call_method`.
-4. **Prefer archiving to deleting:** `odoo_write` with `{"active": false}`.
+   before `odoo_create` / `odoo_write` / `odoo_call_method`.
+4. **Archive instead of deleting:** `odoo_write` with `{"active": false}` (write mode only).
 5. Relational values come back as `[id, "display name"]`. When writing many2one
    use the integer ID; for one2many/many2many use command tuples, e.g.
    `[[6, 0, [ids]]]` (replace), `[[4, id]]` (link), `[[0, 0, {values}]]` (create line).
@@ -85,8 +90,13 @@ Installed apps vary — if a model is missing, check with `odoo_list_models`.
   `["amount_total:sum"]`, groupby `["partner_id"]`, orderby `amount_total desc`.
 - **Confirm a quotation:** `odoo_call_method` model `sale.order`, method
   `action_confirm`, args `[[<id>]]` (after the user agrees).
-- **Find a partner by name:** `odoo_call_method` model `res.partner`, method
-  `name_search`, kwargs `{"name": "Ngọc Việt", "limit": 10}`.
+- **Find a partner by name:** `odoo_search_read` on `res.partner`, domain
+  `[["name","ilike","Ngọc Việt"]]`, fields `name, email, phone`, limit 10.
+- **CRM in the last month:** `odoo_search_read` on `crm.lead`, domain
+  `[["create_date",">=","<today − 30 days> 00:00:00"]]`, fields
+  `name, type, partner_id, contact_name, stage_id, user_id, expected_revenue, source_id, create_date`,
+  order `create_date desc`; summarise per stage with `odoo_read_group`
+  (fields `["expected_revenue:sum"]`, groupby `["stage_id"]`).
 
 ## Troubleshooting
 

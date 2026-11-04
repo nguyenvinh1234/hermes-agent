@@ -12,8 +12,12 @@ Configuration (environment variables):
   ODOO_USERNAME   login (usually an email)
   ODOO_API_KEY    API key (Preferences -> Account Security -> New API Key);
                   ODOO_PASSWORD is accepted as a fallback
-  ODOO_READ_ONLY  "1"/"true" hides create/write/unlink/call_method tools
+  ODOO_ALLOW_WRITE "1"/"true" exposes create/write/call_method (default: read-only)
   ODOO_TIMEOUT    HTTP timeout in seconds (default 60)
+
+Safety policy (Ngoc Viet decision 6, ODOO_NGU_CANH_HIEN_TAI): read-only by default,
+never delete (no unlink tool; call_method refuses unlink), never modify accounting
+(write tools refuse account.* models).
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ import urllib.error
 import urllib.request
 
 SERVER_NAME = "odoo-ngocvietai"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.2.0"
 DEFAULT_URL = "https://odoo.ngocvietai.com"
 SUPPORTED_PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 DEFAULT_LIMIT = 80
@@ -50,7 +54,7 @@ class OdooClient:
         self.db = env.get("ODOO_DB") or ""
         self.username = env.get("ODOO_USERNAME") or ""
         self.secret = env.get("ODOO_API_KEY") or env.get("ODOO_PASSWORD") or ""
-        self.read_only = _truthy(env.get("ODOO_READ_ONLY"))
+        self.allow_write = _truthy(env.get("ODOO_ALLOW_WRITE"))
         self.timeout = float(env.get("ODOO_TIMEOUT") or 60)
         self.uid: int | None = None
         self._ids = itertools.count(1)
@@ -295,20 +299,11 @@ WRITE_TOOLS: list[dict] = [
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True, "openWorldHint": True},
     },
     {
-        "name": "odoo_unlink",
-        "description": "Permanently delete records. Prefer archiving (write active=false) when the model supports it. Always confirm with the user first.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"model": _MODEL, "ids": _IDS, "context": _CONTEXT},
-            "required": ["model", "ids"],
-        },
-        "annotations": {"readOnlyHint": False, "destructiveHint": True, "openWorldHint": True},
-    },
-    {
         "name": "odoo_call_method",
         "description": (
-            "Call any public model method via execute_kw, e.g. sale.order action_confirm on [ids], "
-            "account.move action_post, or a name_search. Methods starting with '_' are private and rejected by Odoo."
+            "Call a public model method via execute_kw, e.g. sale.order action_confirm or "
+            "crm.lead action_set_won on [ids]. Refused by policy: unlink, and any account.* model. "
+            "Methods starting with '_' are private and rejected by Odoo."
         ),
         "inputSchema": {
             "type": "object",
@@ -348,7 +343,7 @@ def _tool_server_info(c: OdooClient, a: dict):
         "database": c.db,
         "server_version": version.get("server_version"),
         "user": user[0] if user else {"id": uid},
-        "read_only": c.read_only,
+        "write_enabled": c.allow_write,
     }
 
 
@@ -412,10 +407,6 @@ def _tool_write(c: OdooClient, a: dict):
     return {"ok": c.execute(a["model"], "write", [a["ids"], a["values"]], _kw_with_context(a))}
 
 
-def _tool_unlink(c: OdooClient, a: dict):
-    return {"ok": c.execute(a["model"], "unlink", [a["ids"]], _kw_with_context(a))}
-
-
 def _tool_call_method(c: OdooClient, a: dict):
     return {"result": c.execute(a["model"], a["method"], a.get("args") or [], a.get("kwargs") or {})}
 
@@ -430,10 +421,21 @@ HANDLERS = {
     "odoo_read_group": _tool_read_group,
     "odoo_create": _tool_create,
     "odoo_write": _tool_write,
-    "odoo_unlink": _tool_unlink,
     "odoo_call_method": _tool_call_method,
 }
 WRITE_TOOL_NAMES = {t["name"] for t in WRITE_TOOLS}
+FORBIDDEN_METHODS = {"unlink"}
+PROTECTED_MODEL_PREFIXES = ("account.",)
+
+
+def _policy_violation(name: str, args: dict) -> str | None:
+    """Return why a write call is refused, or None if policy allows it."""
+    model = str(args.get("model", ""))
+    if model.startswith(PROTECTED_MODEL_PREFIXES):
+        return f"Refused: accounting models ({model}) are read-only through this plugin."
+    if name == "odoo_call_method" and str(args.get("method", "")) in FORBIDDEN_METHODS:
+        return "Refused: deleting records is not allowed; archive with odoo_write {\"active\": false} instead."
+    return None
 
 
 def _text_result(payload, is_error: bool = False) -> dict:
@@ -455,11 +457,15 @@ class McpServer:
         self.client = client
 
     def tools(self) -> list[dict]:
-        return TOOLS if self.client.read_only else TOOLS + WRITE_TOOLS
+        return TOOLS + WRITE_TOOLS if self.client.allow_write else TOOLS
 
     def call_tool(self, name: str, args: dict) -> dict:
-        if name not in HANDLERS or (self.client.read_only and name in WRITE_TOOL_NAMES):
+        if name not in HANDLERS or (name in WRITE_TOOL_NAMES and not self.client.allow_write):
             return _text_result(f"Unknown or disabled tool: {name}", is_error=True)
+        if name in WRITE_TOOL_NAMES:
+            refusal = _policy_violation(name, args or {})
+            if refusal:
+                return _text_result(refusal, is_error=True)
         try:
             return _text_result(HANDLERS[name](self.client, args or {}))
         except OdooError as exc:
@@ -483,7 +489,7 @@ class McpServer:
                 "instructions": (
                     f"Tools for the Odoo ERP at {self.client.url}. Inspect models with odoo_get_fields "
                     "before querying; always pass explicit `fields` and a small `limit`. Confirm with the "
-                    "user before create/write/unlink/call_method."
+                    "user before create/write/call_method."
                 ),
             }
         elif method == "ping":

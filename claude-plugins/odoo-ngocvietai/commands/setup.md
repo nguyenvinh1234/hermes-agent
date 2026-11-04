@@ -15,8 +15,9 @@ Help the user connect this plugin to Odoo at https://odoo.ngocvietai.com, then v
      *Account Security* (Bảo mật tài khoản) → *New API Key*, give it a name, and copy the key
      (it is shown only once). The account password also works, but an API key is safer and can
      be revoked.
-   - Optional: **ODOO_READ_ONLY=1** to hide every tool that changes data;
-     **ODOO_URL** to point at another Odoo instance.
+   - The plugin is **read-only by default**. Only set **ODOO_ALLOW_WRITE=1** if the boss has
+     approved writing; deleting and accounting changes stay blocked even then.
+   - Optional: **ODOO_URL** to point at another Odoo instance.
 3. Tell them to set these as environment variables before starting Claude Code, for example
    in `~/.bashrc` / `~/.zshrc`:
 

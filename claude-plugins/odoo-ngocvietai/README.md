@@ -23,10 +23,13 @@ xác nhận.*
 ### Tools
 
 `odoo_server_info`, `odoo_list_models`, `odoo_get_fields`, `odoo_search_read`,
-`odoo_read`, `odoo_search_count`, `odoo_read_group` (read-only), plus
-`odoo_create`, `odoo_write`, `odoo_unlink`, `odoo_call_method` (write; hidden when
-`ODOO_READ_ONLY=1`). Claude Code asks your permission before each tool call unless
-you allow it.
+`odoo_read`, `odoo_search_count`, `odoo_read_group`: always available, read-only.
+
+`odoo_create`, `odoo_write`, `odoo_call_method`: only when `ODOO_ALLOW_WRITE=1`.
+There is no delete tool, `call_method` refuses `unlink`, and every write to an
+accounting model (`account.*`) is refused before it reaches Odoo (Ngọc Việt policy:
+read-only first, never delete, never edit accounting). Claude Code also asks your
+permission before each tool call unless you allow it.
 
 ## Install
 
@@ -60,7 +63,7 @@ Optional settings:
 | Variable | Default | Meaning |
 |---|---|---|
 | `ODOO_URL` | `https://odoo.ngocvietai.com` | Another Odoo instance |
-| `ODOO_READ_ONLY` | off | `1` hides every tool that modifies data |
+| `ODOO_ALLOW_WRITE` | off | `1` enables create/write/call_method (still no delete, no accounting) |
 | `ODOO_TIMEOUT` | `60` | HTTP timeout, seconds |
 
 You can also put them in `~/.claude/settings.json` under `"env"`. Keep the API key
