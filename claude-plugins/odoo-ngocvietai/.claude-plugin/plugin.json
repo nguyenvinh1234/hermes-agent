@@ -1,6 +1,6 @@
 {
   "name": "odoo-ngocvietai",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Connect Claude Code to the Odoo ERP at odoo.ngocvietai.com: search, read, aggregate, create and update records (partners, sales, invoices, CRM, inventory, projects) through Odoo's JSON-RPC API.",
   "author": {
     "name": "nguyenvinh1234"
@@ -8,5 +8,34 @@
   "homepage": "https://odoo.ngocvietai.com",
   "repository": "https://github.com/nguyenvinh1234/hermes-agent",
   "license": "MIT",
-  "keywords": ["odoo", "erp", "crm", "accounting", "inventory", "ngocvietai"]
+  "keywords": [
+    "odoo",
+    "erp",
+    "crm",
+    "accounting",
+    "inventory",
+    "ngocvietai"
+  ],
+  "userConfig": {
+    "odoo_db": {
+      "type": "string",
+      "title": "Odoo database",
+      "description": "Database name on odoo.ngocvietai.com (Odoo 16 live: odoo)",
+      "default": "odoo",
+      "required": false
+    },
+    "odoo_username": {
+      "type": "string",
+      "title": "Odoo login",
+      "description": "Login email of the Odoo user the AI acts as (use a dedicated read-only AI user)",
+      "required": false
+    },
+    "odoo_api_key": {
+      "type": "string",
+      "title": "Odoo API key",
+      "description": "Odoo → Preferences → Account Security → New API Key. Stored in Claude Code's secure credential storage.",
+      "sensitive": true,
+      "required": false
+    }
+  }
 }

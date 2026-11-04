@@ -110,7 +110,8 @@ class OdooMcpE2E(unittest.TestCase):
         return res["isError"], res["content"][0]["text"]
 
     def test_search_read_authenticates_and_omits_binary_fields_by_default(self):
-        rpc = self.start()
+        # Unset login-form fields arrive as empty strings and must fall back to ODOO_* env vars.
+        rpc = self.start(ODOO_CONFIG_DB="", ODOO_CONFIG_USERNAME="", ODOO_CONFIG_API_KEY="")
         is_err, text = self.call(rpc, "odoo_search_read", {"model": "res.partner", "limit": 5})
         self.assertFalse(is_err, text)
         records = json.loads(text)["records"]
@@ -147,8 +148,9 @@ class OdooMcpE2E(unittest.TestCase):
         self.assertTrue(is_err)
         self.assertIn("not allowed to create", text)
 
-    def test_bad_credentials_report_authentication_failure(self):
-        rpc = self.start(ODOO_API_KEY="wrong")
+    def test_login_form_values_take_precedence_and_bad_credentials_fail(self):
+        # The plugin login form (ODOO_CONFIG_*) wins over environment variables.
+        rpc = self.start(ODOO_CONFIG_API_KEY="wrong")
         is_err, text = self.call(rpc, "odoo_server_info", {})
         self.assertTrue(is_err)
         self.assertIn("Authentication failed", text)

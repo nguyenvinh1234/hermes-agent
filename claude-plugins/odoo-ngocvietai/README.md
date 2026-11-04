@@ -47,18 +47,28 @@ claude plugin install odoo-ngocvietai@ngocvietai
 `/plugin install odoo-ngocvietai@ngocvietai`). For local development:
 `claude --plugin-dir ./claude-plugins/odoo-ngocvietai`.
 
-## Configure
+## Log in (Đăng nhập)
 
-Create an API key in Odoo: avatar menu → **Preferences / Tùy chọn** → **Account
-Security / Bảo mật tài khoản** → **New API Key**. Then export, before starting Claude Code:
+1. In Odoo create an API key for the user the AI should act as (prefer a dedicated
+   read-only AI user): avatar menu → **Preferences / Tùy chọn** → **Account Security /
+   Bảo mật tài khoản** → **New API Key**.
+2. In Claude Code open the plugin's login form:
 
-```bash
-export ODOO_DB="your_database"          # database name (the server hides its DB list)
-export ODOO_USERNAME="you@example.com"  # Odoo login
-export ODOO_API_KEY="..."               # API key (ODOO_PASSWORD also accepted)
-```
+   ```
+   /plugin configure odoo-ngocvietai@ngocvietai
+   ```
 
-Optional settings:
+   Fill in **Odoo database** (`odoo`, pre-filled), **Odoo login** and **Odoo API key**.
+   The key is a *sensitive* field: Claude Code keeps it in its secure credential storage
+   (macOS Keychain; `~/.claude/.credentials.json` elsewhere), not in `settings.json`.
+3. Restart Claude Code, then run `/odoo-ngocvietai:setup` to check the login.
+
+Without the form (CI, scripts) set `ODOO_DB`, `ODOO_USERNAME`, `ODOO_API_KEY` in the
+environment instead; values from the form take precedence. You can also pass them at
+install time: `claude plugin install odoo-ngocvietai@ngocvietai --config odoo_username=...`
+(avoid putting the key on a command line, where shell history keeps it).
+
+Optional settings (environment variables):
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -66,8 +76,7 @@ Optional settings:
 | `ODOO_ALLOW_WRITE` | off | `1` enables create/write/call_method (still no delete, no accounting) |
 | `ODOO_TIMEOUT` | `60` | HTTP timeout, seconds |
 
-You can also put them in `~/.claude/settings.json` under `"env"`. Keep the API key
-out of git. Run `/odoo-ngocvietai:setup` to verify.
+Keep the API key out of git and chat.
 
 ## Examples
 

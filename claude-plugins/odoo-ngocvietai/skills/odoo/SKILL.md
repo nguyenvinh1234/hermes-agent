@@ -100,7 +100,9 @@ Installed apps vary — if a model is missing, check with `odoo_list_models`.
 
 ## Troubleshooting
 
-- *Missing credentials / ODOO_DB is not set* → run `/odoo-ngocvietai:setup`.
+- *Not logged in / database not set* → the user fills the login form:
+  `/plugin configure odoo-ngocvietai@ngocvietai`, then restarts Claude Code
+  (`/odoo-ngocvietai:setup` walks them through it). Never ask for the key in chat.
 - *Authentication failed* → wrong login, DB name, or API key (keys are shown only
   once at creation; make a new one under Preferences → Account Security).
 - *Access Denied / AccessError* → the Odoo user lacks rights for that model; it is

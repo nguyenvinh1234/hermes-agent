@@ -6,7 +6,9 @@ stdin/stdout) and forwards tool calls to Odoo's external JSON-RPC API
 (`/jsonrpc`, services `common` + `object`). No third-party packages are
 needed, so the plugin works with any Python >= 3.8 on PATH.
 
-Configuration (environment variables):
+Configuration: the plugin's login form (/plugin configure odoo-ngocvietai@ngocvietai
+in Claude Code) passes ODOO_CONFIG_DB / ODOO_CONFIG_USERNAME / ODOO_CONFIG_API_KEY;
+an empty form field falls back to the matching environment variable below.
   ODOO_URL        default https://odoo.ngocvietai.com
   ODOO_DB         database name (required unless the server lists exactly one)
   ODOO_USERNAME   login (usually an email)
@@ -31,7 +33,7 @@ import urllib.error
 import urllib.request
 
 SERVER_NAME = "odoo-ngocvietai"
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.3.0"
 DEFAULT_URL = "https://odoo.ngocvietai.com"
 SUPPORTED_PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 DEFAULT_LIMIT = 80
@@ -51,9 +53,11 @@ class OdooClient:
     def __init__(self, env: dict[str, str] | None = None):
         env = os.environ if env is None else env
         self.url = (env.get("ODOO_URL") or DEFAULT_URL).rstrip("/")
-        self.db = env.get("ODOO_DB") or ""
-        self.username = env.get("ODOO_USERNAME") or ""
-        self.secret = env.get("ODOO_API_KEY") or env.get("ODOO_PASSWORD") or ""
+        self.db = env.get("ODOO_CONFIG_DB") or env.get("ODOO_DB") or ""
+        self.username = env.get("ODOO_CONFIG_USERNAME") or env.get("ODOO_USERNAME") or ""
+        self.secret = (
+            env.get("ODOO_CONFIG_API_KEY") or env.get("ODOO_API_KEY") or env.get("ODOO_PASSWORD") or ""
+        )
         self.allow_write = _truthy(env.get("ODOO_ALLOW_WRITE"))
         self.timeout = float(env.get("ODOO_TIMEOUT") or 60)
         self.uid: int | None = None
@@ -110,7 +114,8 @@ class OdooClient:
             return self.db
         raise OdooError(
             "ODOO_DB is not set and the server does not expose a single database. "
-            "Set ODOO_DB to your database name (run /odoo-ngocvietai:setup for help)."
+            "Fill in 'Odoo database' with /plugin configure odoo-ngocvietai@ngocvietai "
+            "(or set ODOO_DB)."
         )
 
     def login(self) -> int:
@@ -118,8 +123,9 @@ class OdooClient:
             return self.uid
         if not self.username or not self.secret:
             raise OdooError(
-                "Missing credentials: set ODOO_USERNAME and ODOO_API_KEY "
-                "(run /odoo-ngocvietai:setup for help)."
+                "Not logged in to Odoo: run /plugin configure odoo-ngocvietai@ngocvietai and fill in "
+                "'Odoo login' and 'Odoo API key', then restart Claude Code "
+                "(or set ODOO_USERNAME / ODOO_API_KEY)."
             )
         db = self._resolve_db()
         uid = self._service("common", "authenticate", db, self.username, self.secret, {})
