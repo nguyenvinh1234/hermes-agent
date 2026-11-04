@@ -1,0 +1,12 @@
+{
+  "name": "odoo-ngocvietai",
+  "version": "0.1.0",
+  "description": "Connect Claude Code to the Odoo ERP at odoo.ngocvietai.com: search, read, aggregate, create and update records (partners, sales, invoices, CRM, inventory, projects) through Odoo's JSON-RPC API.",
+  "author": {
+    "name": "nguyenvinh1234"
+  },
+  "homepage": "https://odoo.ngocvietai.com",
+  "repository": "https://github.com/nguyenvinh1234/hermes-agent",
+  "license": "MIT",
+  "keywords": ["odoo", "erp", "crm", "accounting", "inventory", "ngocvietai"]
+}

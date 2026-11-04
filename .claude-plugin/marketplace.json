@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ngocvietai",
+  "description": "Claude Code plugins for NgocVietAI systems.",
+  "owner": {
+    "name": "nguyenvinh1234",
+    "url": "https://github.com/nguyenvinh1234"
+  },
+  "plugins": [
+    {
+      "name": "odoo-ngocvietai",
+      "source": "./claude-plugins/odoo-ngocvietai",
+      "description": "Connect Claude Code to the Odoo ERP at odoo.ngocvietai.com (search, read, report on and update records).",
+      "version": "0.1.0",
+      "homepage": "https://odoo.ngocvietai.com",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["odoo", "erp", "crm"]
+    }
+  ]
+}
