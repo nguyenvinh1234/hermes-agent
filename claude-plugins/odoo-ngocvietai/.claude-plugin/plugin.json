@@ -1,6 +1,6 @@
 {
   "name": "odoo-ngocvietai",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Connect Claude Code to the Odoo ERP at odoo.ngocvietai.com: search, read, aggregate, create and update records (partners, sales, invoices, CRM, inventory, projects) through Odoo's JSON-RPC API.",
   "author": {
     "name": "nguyenvinh1234"
@@ -36,6 +36,20 @@
       "description": "Odoo → Preferences → Account Security → New API Key. Stored in Claude Code's secure credential storage.",
       "sensitive": true,
       "required": false
+    }
+  },
+  "mcpServers": {
+    "odoo": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/server/odoo_mcp.py"
+      ],
+      "env": {
+        "ODOO_URL": "${ODOO_URL:-https://odoo.ngocvietai.com}",
+        "ODOO_CONFIG_DB": "${user_config.odoo_db}",
+        "ODOO_CONFIG_USERNAME": "${user_config.odoo_username}",
+        "ODOO_CONFIG_API_KEY": "${user_config.odoo_api_key}"
+      }
     }
   }
 }

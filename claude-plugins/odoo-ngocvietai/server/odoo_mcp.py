@@ -33,7 +33,7 @@ import urllib.error
 import urllib.request
 
 SERVER_NAME = "odoo-ngocvietai"
-SERVER_VERSION = "0.3.0"
+SERVER_VERSION = "0.3.1"
 DEFAULT_URL = "https://odoo.ngocvietai.com"
 SUPPORTED_PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 DEFAULT_LIMIT = 80

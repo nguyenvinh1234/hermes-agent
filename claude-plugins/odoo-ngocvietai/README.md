@@ -13,8 +13,7 @@ xác nhận.*
 
 | Path | Purpose |
 |---|---|
-| `.claude-plugin/plugin.json` | Plugin manifest |
-| `.mcp.json` | Registers the `odoo` MCP server (`python3 server/odoo_mcp.py`) |
+| `.claude-plugin/plugin.json` | Plugin manifest: login form (`userConfig`) and the `odoo` MCP server (`python3 server/odoo_mcp.py`). The server is declared here, not in `.mcp.json`, because this repo's `.gitignore` excludes `.mcp.json` files |
 | `server/odoo_mcp.py` | MCP stdio server, **Python standard library only**: nothing to `pip install` |
 | `skills/odoo/SKILL.md` | Teaches Claude Odoo domains, common models and safe write rules |
 | `commands/setup.md` | `/odoo-ngocvietai:setup`: guided configuration and connection check |
@@ -33,17 +32,20 @@ permission before each tool call unless you allow it.
 
 ## Install
 
+The plugin lives on branch `claude/happy-fermi-5ksp8h` until it is merged; after the merge
+drop the `@claude/happy-fermi-5ksp8h` suffix.
+
 Requirements: Claude Code and `python3` (3.8+) on `PATH`.
 
 ```bash
-claude plugin marketplace add nguyenvinh1234/hermes-agent
+claude plugin marketplace add nguyenvinh1234/hermes-agent@claude/happy-fermi-5ksp8h
 ```
 
 ```bash
 claude plugin install odoo-ngocvietai@ngocvietai
 ```
 
-(or inside Claude Code: `/plugin marketplace add nguyenvinh1234/hermes-agent`, then
+(or inside Claude Code: `/plugin marketplace add nguyenvinh1234/hermes-agent@claude/happy-fermi-5ksp8h`, then
 `/plugin install odoo-ngocvietai@ngocvietai`). For local development:
 `claude --plugin-dir ./claude-plugins/odoo-ngocvietai`.
 
